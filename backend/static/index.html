@@ -1,0 +1,175 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Clipbay — cut a clip from any video URL</title>
+<meta name="description" content="Paste a video URL, mark an in/out point, crop it, and download the exact clip you need." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="grain"></div>
+
+  <header class="topbar">
+    <a class="wordmark" href="/">
+      <span class="reel-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="7" r="1.6" fill="currentColor"/><circle cx="16.3" cy="9.8" r="1.6" fill="currentColor"/><circle cx="14.7" cy="14.9" r="1.6" fill="currentColor"/><circle cx="9.3" cy="14.9" r="1.6" fill="currentColor"/><circle cx="7.7" cy="9.8" r="1.6" fill="currentColor"/></svg>
+      </span>
+      Clipbay
+    </a>
+    <p class="tagline">Paste a link. Mark in and out. Take the clip.</p>
+  </header>
+
+  <main class="shell">
+
+    <!-- STEP 1 — URL input -->
+    <section class="card" id="card-url">
+      <div class="card-head">
+        <span class="step-tag">01 — Source</span>
+        <h2>Drop in a video URL</h2>
+      </div>
+      <div class="url-row">
+        <input id="url-input" type="url" placeholder="https://…" autocomplete="off" spellcheck="false" />
+        <button id="load-btn" class="btn btn-primary">
+          <span class="btn-label">Load</span>
+          <span class="btn-spinner" hidden></span>
+        </button>
+      </div>
+      <p class="hint">Only use links to videos you own or have explicit permission to download. Clipbay does not bypass paywalls, DRM, or private content.</p>
+      <p class="error-line" id="url-error" hidden></p>
+    </section>
+
+    <!-- STEP 2 — Preview + crop -->
+    <section class="card hidden" id="card-preview">
+      <div class="card-head">
+        <span class="step-tag">02 — Frame</span>
+        <h2>Preview &amp; crop</h2>
+      </div>
+
+      <div class="preview-grid">
+        <div class="thumb-wrap" id="thumb-wrap">
+          <img id="thumb-img" alt="Video thumbnail" />
+          <div class="crop-box" id="crop-box">
+            <div class="crop-handle" data-handle="nw"></div>
+            <div class="crop-handle" data-handle="ne"></div>
+            <div class="crop-handle" data-handle="sw"></div>
+            <div class="crop-handle" data-handle="se"></div>
+          </div>
+        </div>
+
+        <div class="meta-panel">
+          <h3 id="video-title">—</h3>
+          <dl class="meta-list">
+            <div><dt>Source</dt><dd id="video-source">—</dd></div>
+            <div><dt>Duration</dt><dd id="video-duration" class="mono">—</dd></div>
+            <div><dt>Native size</dt><dd id="video-dims" class="mono">—</dd></div>
+          </dl>
+          <button id="crop-toggle" class="btn btn-ghost btn-small">Enable crop</button>
+          <p class="crop-readout mono" id="crop-readout" hidden>x0 y0 · w0 h0</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3 — Timeline / trim (signature element) -->
+    <section class="card hidden" id="card-timeline">
+      <div class="card-head">
+        <span class="step-tag">03 — Mark</span>
+        <h2>Set in &amp; out</h2>
+      </div>
+
+      <div class="timecode-row">
+        <div class="tc-block">
+          <span class="tc-label">IN</span>
+          <span class="tc-value mono" id="tc-in">00:00:00.0</span>
+        </div>
+        <div class="tc-block">
+          <span class="tc-label">DURATION</span>
+          <span class="tc-value mono" id="tc-clip-duration">00:00:00.0</span>
+        </div>
+        <div class="tc-block">
+          <span class="tc-label">OUT</span>
+          <span class="tc-value mono" id="tc-out">00:00:00.0</span>
+        </div>
+      </div>
+
+      <div class="filmstrip" id="filmstrip">
+        <div class="sprockets sprockets-top" aria-hidden="true"></div>
+        <div class="track">
+          <div class="range-fill" id="range-fill"></div>
+          <div class="handle handle-in" id="handle-in" tabindex="0" role="slider" aria-label="Clip start"></div>
+          <div class="handle handle-out" id="handle-out" tabindex="0" role="slider" aria-label="Clip end"></div>
+        </div>
+        <div class="sprockets sprockets-bottom" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <!-- STEP 4 — Output settings -->
+    <section class="card hidden" id="card-output">
+      <div class="card-head">
+        <span class="step-tag">04 — Output</span>
+        <h2>Format &amp; quality</h2>
+      </div>
+
+      <div class="field-group">
+        <span class="field-label">Container</span>
+        <div class="chip-row" id="container-chips">
+          <button class="chip active" data-container="mp4">MP4</button>
+          <button class="chip" data-container="webm">WebM</button>
+          <button class="chip" data-container="mkv">MKV</button>
+          <button class="chip" data-container="mp3">MP3 (audio)</button>
+          <button class="chip" data-container="m4a">M4A (audio)</button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <span class="field-label">Quality</span>
+        <div class="chip-row" id="quality-chips">
+          <!-- populated from probed resolutions -->
+        </div>
+      </div>
+
+      <label class="permission-row">
+        <input type="checkbox" id="confirm-permission" />
+        <span>I own this video or have permission to download it.</span>
+      </label>
+
+      <button id="render-btn" class="btn btn-record" disabled>
+        <span class="rec-dot" aria-hidden="true"></span>
+        <span class="btn-label">Render clip</span>
+      </button>
+      <p class="error-line" id="process-error" hidden></p>
+    </section>
+
+    <!-- STEP 5 — Progress / result -->
+    <section class="card hidden" id="card-progress">
+      <div class="card-head">
+        <span class="step-tag">05 — Render</span>
+        <h2 id="progress-heading">Processing…</h2>
+      </div>
+
+      <div class="tape-bar">
+        <div class="tape-fill" id="tape-fill"></div>
+      </div>
+      <p class="progress-message mono" id="progress-message">Queued</p>
+
+      <div class="result-row hidden" id="result-row">
+        <div class="result-meta">
+          <span id="result-name" class="mono"></span>
+          <span id="result-size" class="mono muted"></span>
+        </div>
+        <a id="download-link" class="btn btn-primary" href="#" download>Download clip</a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <span>Clipbay — self-hosted clip cutter. Respect copyright and platform terms of service.</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

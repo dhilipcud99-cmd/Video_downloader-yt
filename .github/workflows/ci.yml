@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Byte-compile app
+        working-directory: backend
+        run: python -m compileall app
+
+      - name: Import sanity check
+        working-directory: backend
+        run: python -c "from app.main import app; print('FastAPI app import OK:', app.title)"
+
+      - name: ffmpeg present
+        run: ffmpeg -version
